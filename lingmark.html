@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>灵墨笔记 LingMark</title>
+
+<!-- Fonts (system fonts — works offline and in China) -->
+
+<!-- Quill Editor -->
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+
+<style>
+/* ============================================================
+   DESIGN TOKENS — Editorial × Swiss Minimalism
+   ============================================================ */
+:root {
+  --color-ink: #1A1A1A;
+  --color-vermillion: #C53030;
+  --color-indigo: #2B6CB0;
+  --color-warm: #FAFAF9;
+  --color-card: #FFFFFF;
+  --color-border: #E2E0DC;
+  --color-muted: #8A8885;
+  --color-hover: #F3F1ED;
+  --color-active: #EDEAE5;
+  --color-shadow: rgba(26, 26, 26, 0.06);
+
+  /* Editorial × Swiss: deliberate Chinese system typography */
+  --font-ui: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', -apple-system, sans-serif;
+  --font-body: 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;
+  --font-mono: 'Cascadia Code', 'Consolas', 'SF Mono', 'Courier New', monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --sidebar-width: 280px;
+  --header-height: 52px;
+
+  --transition-fast: 150ms ease;
+  --transition-smooth: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark {
+  --color-ink: #E8E6E3;
+  --color-vermillion: #FC8181;
+  --color-indigo: #90CDF4;
+  --color-warm: #1A1A1A;
+  --color-card: #242424;
+  --color-border: #3A3A3A;
+  --color-muted: #8A8A88;
+  --color-hover: #2E2E2E;
+  --color-active: #333333;
+  --color-shadow: rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--color-ink);
+  background: var(--color-warm);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background var(--transition-smooth), color var(--transition-smooth);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+}
+
+input {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  border: none;
+  outline: none;
+  background: none;
+}
+
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+#app {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: var(--header-height) 1fr;
+  grid-template-areas:
+    "header header"
+    "sidebar main";
+  height: 100vh;
+  transition: grid-template-columns var(--transition-smooth);
+}
+
+#app.sidebar-collapsed {
+  grid-template-columns: 0px 1fr;
+}
+
+/* ---- Header ---- */
+#header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  z-index: 10;
+  transition: background var(--transition-smooth), border var(--transition-smooth);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-logo {
+  width: 28px;
+  height: 28px;
+  background: var(--color-ink);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-card);
+  font-weight: 700;
+  font-size: 15px;
+  transition: background var(--transition-smooth), color var(--transition-smooth);
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  -webkit-app-region: no-drag;
+}
+
+.header-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
+  transition: all var(--transition-fast);
+}
+
+.header-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}
+
+/* ---- Sidebar ---- */
+#sidebar {
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-card);
+  border-right: 1px solid var(--color-border);
+  overflow: hidden;
+  transition: all var(--transition-smooth);
+}
+
+#app.sidebar-collapsed #sidebar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-top {
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-wrapper {
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px 0 32px;
+  background: var(--color-warm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  transition: all var(--transition-fast);
+}
+
+.search-input::placeholder { color: var(--color-muted); }
+.search-input:focus {
+  border-color: var(--color-indigo);
+  box-shadow: 0 0 0 2px rgba(43, 108, 176, 0.12);
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.btn-new-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 34px;
+  background: var(--color-ink);
+  color: var(--color-card);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.btn-new-note:hover { opacity: 0.88; }
+.btn-new-note:active { transform: scale(0.98); }
+
+.sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 16px;
+}
+
+.sidebar-body::-webkit-scrollbar { width: 4px; }
+.sidebar-body::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 2px;
+}
+
+/* ---- Folder Tree ---- */
+.folder-tree { user-select: none; }
+
+.folder-item { }
+
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink);
+  position: relative;
+}
+
+.folder-row:hover { background: var(--color-hover); }
+.folder-row.active { background: var(--color-active); }
+
+.folder-caret {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+  color: var(--color-muted);
+}
+
+.folder-caret svg { width: 14px; height: 14px; }
+.folder-item.expanded > .folder-row > .folder-caret { transform: rotate(90deg); }
+.folder-item.empty > .folder-row > .folder-caret { visibility: hidden; }
+
+.folder-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--color-muted);
+}
+
+.folder-icon svg { width: 16px; height: 16px; }
+
+.folder-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.folder-count {
+  font-size: 11px;
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+.folder-menu-btn {
+  width: 22px;
+  height: 22px;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--color-muted);
+  transition: all var(--transition-fast);
+}
+
+.folder-row:hover .folder-menu-btn { opacity: 1; }
+.folder-menu-btn:hover { background: var(--color-border); }
+
+/* folder context menu */
+.folder-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px var(--color-shadow);
+  z-index: 50;
+  min-width: 140px;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.folder-menu.show { display: block; }
+
+.folder-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  white-space: nowrap;
+}
+.folder-menu-item:hover { background: var(--color-hover); }
+.folder-menu-item.danger { color: var(--color-vermillion); }
+
+/* ---- Folder Children ---- */
+.folder-children {
+  padding-left: 14px;
+  display: none;
+}
+.folder-item.expanded > .folder-children { display: block; }
+
+/* ---- Note List ---- */
+.note-list {
+  padding-left: 14px;
+  display: none;
+}
+.folder-item.expanded > .folder-children > .note-list { display: block; }
+
+.note-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 30px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-size: 13px;
+  position: relative;
+}
+
+.note-item::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-muted);
+  opacity: 0.4;
+}
+
+.note-item:hover { background: var(--color-hover); }
+.note-item.active {
+  background: var(--color-active);
+}
+.note-item.active::before {
+  background: var(--color-indigo);
+  opacity: 1;
+}
+
+.note-title-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-date {
+  font-size: 11px;
+  color: var(--color-muted);
+  flex-shrink: 0;
+}
+
+.note-delete-btn {
+  width: 20px;
+  height: 20px;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--color-muted);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.note-item:hover .note-delete-btn { opacity: 1; }
+.note-delete-btn:hover { color: var(--color-vermillion); background: var(--color-hover); }
+
+/* ---- Empty State ---- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--color-muted);
+  gap: 8px;
+}
+
+.empty-state svg { width: 40px; height: 40px; opacity: 0.3; }
+.empty-state p { font-size: 13px; line-height: 1.5; }
+
+/* ---- No Note Selected ---- */
+.no-note-selected {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-muted);
+  gap: 10px;
+}
+
+.no-note-selected .icon-wrapper {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--color-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.no-note-selected svg { width: 28px; height: 28px; opacity: 0.4; }
+.no-note-selected h3 { font-size: 16px; font-weight: 500; color: var(--color-ink); }
+.no-note-selected p { font-size: 13px; }
+
+/* ============================================================
+   MAIN / EDITOR AREA
+   ============================================================ */
+#main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-warm);
+  transition: background var(--transition-smooth);
+}
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 28px 10px;
+  flex-shrink: 0;
+}
+
+.note-title-input {
+  flex: 1;
+  font-size: 26px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  letter-spacing: -0.01em;
+  padding: 4px 0;
+  color: var(--color-ink);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  transition: border-color var(--transition-fast);
+}
+
+.note-title-input:focus {
+  border-bottom-color: var(--color-indigo);
+}
+
+.note-title-input::placeholder {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.save-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-muted);
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  transition: all var(--transition-smooth);
+}
+
+.save-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #48BB78;
+}
+
+.editor-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 0 28px 40px;
+}
+
+.editor-container::-webkit-scrollbar { width: 6px; }
+.editor-container::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+.editor-paper {
+  width: 100%;
+  max-width: 780px;
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 3px var(--color-shadow), 0 4px 12px var(--color-shadow);
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+  transition: background var(--transition-smooth), box-shadow var(--transition-smooth);
+}
+
+/* ============================================================
+   QUILL OVERRIDES — Editorial Swiss Styling
+   ============================================================ */
+.ql-toolbar.ql-snow {
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  padding: 8px 16px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--color-card);
+  font-family: var(--font-ui);
+  transition: background var(--transition-smooth), border var(--transition-smooth);
+}
+
+.ql-toolbar.ql-snow .ql-stroke { stroke: var(--color-muted); }
+.ql-toolbar.ql-snow .ql-fill { fill: var(--color-muted); }
+.ql-toolbar.ql-snow .ql-picker { color: var(--color-muted); }
+.ql-toolbar.ql-snow .ql-picker-options {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px var(--color-shadow);
+}
+.ql-toolbar.ql-snow button:hover .ql-stroke,
+.ql-toolbar.ql-snow button.ql-active .ql-stroke { stroke: var(--color-ink); }
+.ql-toolbar.ql-snow button:hover .ql-fill,
+.ql-toolbar.ql-snow button.ql-active .ql-fill { fill: var(--color-ink); }
+.ql-toolbar.ql-snow .ql-picker-label:hover,
+.ql-toolbar.ql-snow .ql-picker-label.ql-active { color: var(--color-ink); }
+
+.ql-container.ql-snow {
+  border: none;
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--color-ink);
+  line-height: 1.8;
+  flex: 1;
+  transition: color var(--transition-smooth);
+}
+
+.ql-editor {
+  padding: 28px 36px;
+  min-height: 300px;
+}
+
+.ql-editor.ql-blank::before {
+  font-style: italic;
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-size: 16px;
+}
+
+.ql-editor h1 { font-size: 2em; font-weight: 600; margin: 1em 0 0.4em; letter-spacing: -0.02em; }
+.ql-editor h2 { font-size: 1.5em; font-weight: 600; margin: 1em 0 0.3em; letter-spacing: -0.01em; }
+.ql-editor h3 { font-size: 1.25em; font-weight: 600; margin: 0.8em 0 0.2em; }
+.ql-editor p { margin: 0.5em 0; }
+.ql-editor blockquote {
+  border-left: 3px solid var(--color-vermillion);
+  padding: 8px 0 8px 18px;
+  margin: 1em 0;
+  color: var(--color-muted);
+  font-style: italic;
+}
+.ql-editor pre.ql-syntax {
+  background: var(--color-warm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 16px 20px;
+  overflow-x: auto;
+}
+.ql-editor ol, .ql-editor ul { padding-left: 1.5em; }
+.ql-editor li { margin: 0.3em 0; }
+.ql-editor a { color: var(--color-indigo); text-decoration: underline; }
+
+/* ============================================================
+   DIALOG OVERLAY
+   ============================================================ */
+.dialog-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.dialog-overlay.show { display: flex; }
+
+.dialog-box {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 360px;
+  max-width: 90vw;
+  box-shadow: 0 16px 48px var(--color-shadow);
+}
+
+.dialog-box h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+
+.dialog-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  background: var(--color-warm);
+  transition: border var(--transition-fast);
+}
+
+.dialog-input:focus {
+  border-color: var(--color-indigo);
+  box-shadow: 0 0 0 2px rgba(43, 108, 176, 0.12);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.dialog-btn {
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.dialog-btn.cancel {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}
+.dialog-btn.cancel:hover { background: var(--color-active); }
+
+.dialog-btn.confirm {
+  background: var(--color-ink);
+  color: var(--color-card);
+}
+.dialog-btn.confirm:hover { opacity: 0.88; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 768px) {
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "main";
+  }
+
+  #sidebar {
+    position: fixed;
+    left: 0;
+    top: var(--header-height);
+    bottom: 0;
+    width: var(--sidebar-width);
+    z-index: 20;
+    box-shadow: 4px 0 20px var(--color-shadow);
+    transform: translateX(-100%);
+    transition: transform var(--transition-smooth);
+  }
+
+  #sidebar.mobile-open { transform: translateX(0); }
+
+  .editor-paper { border-radius: 0; box-shadow: none; }
+  .ql-toolbar.ql-snow { border-radius: 0; }
+  .ql-editor { padding: 20px; }
+  .editor-header { padding: 12px 16px 8px; }
+  .note-title-input { font-size: 20px; }
+  .editor-container { padding: 0; }
+
+  .header-btn.mobile-menu { display: flex; }
+}
+
+@media (min-width: 769px) {
+  .header-btn.mobile-menu { display: none; }
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.folder-row, .note-item {
+  animation: fadeIn 0.2s ease both;
+}
+</style>
+</head>
+<body>
+
+<!-- ==============================
+  DIALOG — New Folder / Rename
+  =============================== -->
+<div class="dialog-overlay" id="dialog">
+  <div class="dialog-box">
+    <h3 id="dialog-title">新建文件夹</h3>
+    <input class="dialog-input" id="dialog-input" placeholder="输入文件夹名称" autocomplete="off">
+    <div class="dialog-actions">
+      <button class="dialog-btn cancel" onclick="closeDialog()">取消</button>
+      <button class="dialog-btn confirm" id="dialog-confirm">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==============================
+  APP SHELL
+  =============================== -->
+<div id="app">
+
+  <!-- HEADER -->
+  <header id="header">
+    <div class="header-left">
+      <button class="header-btn mobile-menu" onclick="toggleMobileSidebar()" title="菜单">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <button class="header-btn" onclick="toggleSidebar()" title="切换侧边栏">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+      </button>
+      <div class="header-logo">墨</div>
+      <span class="header-title">灵墨笔记</span>
+    </div>
+    <div class="header-right">
+      <button class="header-btn" id="theme-toggle" onclick="toggleTheme()" title="切换主题">
+        <!-- sun icon -->
+        <svg id="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        <!-- moon icon -->
+        <svg id="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-top">
+      <div class="search-wrapper">
+        <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input class="search-input" placeholder="搜索笔记..." id="search-input" oninput="handleSearch(this.value)">
+      </div>
+      <button class="btn-new-note" onclick="createNote()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        新建笔记
+      </button>
+    </div>
+    <div class="sidebar-body" id="sidebar-body">
+      <div class="folder-tree" id="folder-tree"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN / EDITOR -->
+  <main id="main">
+    <div id="editor-view" style="display:flex;flex-direction:column;height:100%">
+      <!-- shown when a note is selected -->
+      <div class="editor-header" id="editor-header">
+        <input class="note-title-input" id="note-title" placeholder="笔记标题" oninput="updateTitle(this.value)">
+        <div class="save-indicator">
+          <span class="save-dot"></span>
+          <span>已保存</span>
+        </div>
+      </div>
+      <div class="editor-container">
+        <div class="editor-paper">
+          <div id="quill-editor"></div>
+        </div>
+      </div>
+    </div>
+    <!-- shown when no note selected -->
+    <div class="no-note-selected" id="no-note-view">
+      <div class="icon-wrapper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+      </div>
+      <h3>选择或创建一篇笔记</h3>
+      <p>从左侧边栏选择笔记，或点击「新建笔记」开始写作</p>
+    </div>
+  </main>
+
+</div>
+
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+let folders = [
+  { id: 'f1', name: '项目', expanded: true },
+  { id: 'f2', name: '个人', expanded: false },
+  { id: 'f3', name: '灵感', expanded: false },
+];
+
+let notes = [
+  { id: 'n1', folderId: 'f1', title: '项目启动会议纪要', content: '<h2>📋 会议摘要</h2><p><strong>时间：</strong>2026年7月20日 14:00</p><p><strong>参会人：</strong>产品、设计、前端、后端</p><h3>核心决议</h3><ol><li>Q3 重点投入 AI 辅助写作功能</li><li>编辑器底层从 Slate 迁移到 ProseMirror</li><li>多端同步方案采用 CRDT 而非 OT</li></ol><blockquote>下周一前各团队输出技术评估文档，周三二次对齐。</blockquote>', updatedAt: 1751212800000 },
+  { id: 'n2', folderId: 'f1', title: '技术方案对比', content: '<h2>编辑器引擎选型</h2><table><thead><tr><th>方案</th><th>优势</th><th>劣势</th></tr></thead><tbody><tr><td>ProseMirror</td><td>社区成熟、插件丰富、协同支持好</td><td>学习曲线陡峭</td></tr><tr><td>Slate</td><td>React 原生、API 优雅</td><td>破坏性更新频繁</td></tr><tr><td>Tiptap</td><td>开箱即用、文档完善</td><td>深度定制受限</td></tr></tbody></table><p><br></p><p><strong>结论：</strong>推荐 Tiptap（基于 ProseMirror），兼顾开发效率和灵活性。</p>', updatedAt: 1751126400000 },
+  { id: 'n3', folderId: 'f1', title: 'Q3 OKR 规划', content: '<h2>Objective：打造一流知识管理体验</h2><h3>KR1：编辑器 NPS ≥ 60</h3><ul><li>块编辑器 MVP 上线</li><li>Markdown 实时渲染</li><li>斜杠命令支持 20+ 块类型</li></ul><h3>KR2：DAU 突破 1000</h3><ul><li>邀请机制上线</li><li>SEO 基础优化</li><li>社区运营启动</li></ul><h3>KR3：AI 功能使用率 ≥ 30%</h3><ul><li>AI 续写 &amp; 摘要上线</li><li>RAG 问答灰度</li></ul>', updatedAt: 1751040000000 },
+  { id: 'n4', folderId: 'f2', title: '读书笔记：深度工作', content: '<h2>《深度工作》— Cal Newport</h2><blockquote>深度工作是指在无干扰的状态下专注进行的职业活动，能将认知能力推向极限。</blockquote><h3>四个准则</h3><ol><li><strong>拥抱无聊</strong> — 训练自己在排队、等车时不碰手机</li><li><strong>减少浅层工作</strong> — 每天固定时段处理邮件和消息</li><li><strong>深度工作仪式</strong> — 固定时间、地点、时长</li><li><strong>远离社交媒体</strong> — 工具应该服务目标，而非劫持注意力</li></ol><h3>我的行动计划</h3><ul><li>每天早上 7:00–9:30 为深度工作时间</li><li>手机放另一个房间</li><li>用纸笔做计划而非 App</li></ul>', updatedAt: 1751385600000 },
+  { id: 'n5', folderId: 'f2', title: '周末菜谱：红烧排骨', content: '<h2>🍖 红烧排骨</h2><h3>食材</h3><ul><li>猪小排 500g</li><li>冰糖 30g</li><li>生抽、老抽、料酒</li><li>葱姜蒜、八角、桂皮</li></ul><h3>步骤</h3><ol><li>排骨冷水下锅焯水，撇去浮沫捞出</li><li>锅中少油，小火炒冰糖至融化变焦糖色</li><li>下排骨翻炒上色，加葱姜蒜八角桂皮炒香</li><li>加生抽 2 勺、老抽 1 勺、料酒 1 勺</li><li>加热水没过排骨，大火烧开转小火炖 40 分钟</li><li>转大火收汁，撒葱花出锅</li></ol><p><br></p><p><em>关键在于炒糖色——焦而不苦，汤色红亮。</em></p>', updatedAt: 1751558400000 },
+];
+
+let nextId = 100;
+let currentNoteId = null;
+let quill = null;
+let contextMenuTarget = null;
+
+/* ============================================================
+   INIT
+   ============================================================ */
+function init() {
+  // Load theme
+  const savedTheme = localStorage.getItem('lingmark-theme');
+  if (savedTheme === 'dark') {
+    document.documentElement.classList.add('dark');
+    document.getElementById('icon-sun').style.display = 'none';
+    document.getElementById('icon-moon').style.display = '';
+  }
+
+  // Init Quill
+  quill = new Quill('#quill-editor', {
+    modules: {
+      toolbar: [
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline'],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        ['blockquote', 'code-block'],
+        ['link'],
+        ['clean'],
+      ],
+    },
+    placeholder: '开始书写...',
+    theme: 'snow',
+  });
+
+  quill.on('text-change', onEditorChange);
+
+  // Render sidebar
+  renderSidebar();
+
+  // Show no-note view by default
+  showNoNoteView();
+
+  // Close context menu on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.folder-menu-btn')) {
+      closeAllMenus();
+    }
+  });
+
+  // Dialog enter key
+  document.getElementById('dialog-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('dialog-confirm').click();
+    if (e.key === 'Escape') closeDialog();
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      e.preventDefault();
+      createNote();
+    }
+  });
+}
+
+/* ============================================================
+   THEME
+   ============================================================ */
+function toggleTheme() {
+  const isDark = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('lingmark-theme', isDark ? 'dark' : 'light');
+  document.getElementById('icon-sun').style.display = isDark ? 'none' : '';
+  document.getElementById('icon-moon').style.display = isDark ? '' : 'none';
+}
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+function toggleSidebar() {
+  document.getElementById('app').classList.toggle('sidebar-collapsed');
+}
+
+function toggleMobileSidebar() {
+  document.getElementById('sidebar').classList.toggle('mobile-open');
+}
+
+function renderSidebar() {
+  const tree = document.getElementById('folder-tree');
+  tree.innerHTML = '';
+
+  // Folders at root level (parentId === null concept — our flat model: all folders are root)
+  const rootFolders = folders.slice();
+
+  if (rootFolders.length === 0) {
+    tree.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <p>还没有文件夹<br><a href="javascript:createFolder()" style="color:var(--color-indigo);text-decoration:none">创建第一个文件夹</a></p>
+      </div>`;
+    return;
+  }
+
+  rootFolders.forEach(f => {
+    tree.appendChild(renderFolderItem(f));
+  });
+
+  // "New Folder" button at bottom
+  const addBtn = document.createElement('button');
+  addBtn.className = 'folder-row';
+  addBtn.style.cssText = 'margin-top:4px;color:var(--color-muted);font-weight:400;';
+  addBtn.innerHTML = `
+    <span class="folder-caret"></span>
+    <span class="folder-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span>
+    <span class="folder-name">新建文件夹</span>`;
+  addBtn.onclick = (e) => { e.stopPropagation(); createFolder(); };
+  tree.appendChild(addBtn);
+}
+
+function renderFolderItem(folder) {
+  const notesInFolder = notes.filter(n => n.folderId === folder.id);
+  const childFolders = folders.filter(f => f.parentId === folder.id);
+  const hasChildren = notesInFolder.length > 0 || childFolders.length > 0;
+
+  const div = document.createElement('div');
+  div.className = 'folder-item' + (folder.expanded ? ' expanded' : '') + (!hasChildren ? ' empty' : '');
+  div.dataset.id = folder.id;
+
+  div.innerHTML = `
+    <div class="folder-row" data-action="toggle">
+      <span class="folder-caret">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </span>
+      <span class="folder-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      </span>
+      <span class="folder-name">${escapeHtml(folder.name)}</span>
+      <span class="folder-count">${notesInFolder.length}</span>
+      <span class="folder-menu-btn" data-action="menu">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="6" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="18" r="1"/></svg>
+      </span>
+      <div class="folder-menu">
+        <div class="folder-menu-item" data-action="rename"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>重命名</div>
+        <div class="folder-menu-item" data-action="new-note"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新建笔记</div>
+        <div class="folder-menu-item" data-action="new-folder"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 11v6M9 14h6"/></svg>新建子文件夹</div>
+        <div class="folder-menu-item danger" data-action="delete"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>删除文件夹</div>
+      </div>
+    </div>
+    <div class="folder-children">
+      <div class="note-list"></div>
+    </div>`;
+
+  // Attach event listeners
+  const row = div.querySelector('.folder-row');
+  row.addEventListener('click', (e) => {
+    const action = e.target.closest('[data-action]')?.dataset?.action;
+    if (action === 'menu') {
+      e.stopPropagation();
+      openMenu(div);
+      return;
+    }
+    // Toggle expand
+    folder.expanded = !folder.expanded;
+    div.classList.toggle('expanded', folder.expanded);
+    if (!folder.expanded) div.classList.remove('empty'); // re-eval on next render... actually keep empty if no children
+    else renderFolderChildren(div, folder);
+  });
+
+  // Menu item clicks
+  div.querySelectorAll('.folder-menu-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const action = item.dataset.action;
+      closeAllMenus();
+      if (action === 'rename') renameFolder(folder);
+      else if (action === 'new-note') createNoteInFolder(folder.id);
+      else if (action === 'new-folder') createFolder();
+      else if (action === 'delete') deleteFolder(folder);
+    });
+  });
+
+  // Render children if expanded
+  if (folder.expanded) {
+    renderFolderChildren(div, folder);
+  }
+
+  return div;
+}
+
+function renderFolderChildren(container, folder) {
+  const notesList = container.querySelector('.note-list');
+  const notesInFolder = notes.filter(n => n.folderId === folder.id);
+
+  if (notesInFolder.length === 0) {
+    notesList.innerHTML = '<div class="empty-state" style="padding:16px"><p style="font-size:12px">暂无笔记</p></div>';
+  } else {
+    notesList.innerHTML = notesInFolder
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map(n => `
+        <div class="note-item${currentNoteId === n.id ? ' active' : ''}" data-note-id="${n.id}" onclick="selectNote('${n.id}')">
+          <span class="note-title-text">${escapeHtml(n.title)}</span>
+          <span class="note-date">${formatDate(n.updatedAt)}</span>
+          <span class="note-delete-btn" onclick="deleteNote(event, '${n.id}')" title="删除">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </span>
+        </div>`)
+      .join('');
+  }
+}
+
+function openMenu(folderDiv) {
+  closeAllMenus();
+  const menu = folderDiv.querySelector('.folder-menu');
+  menu.classList.add('show');
+  contextMenuTarget = menu;
+}
+
+function closeAllMenus() {
+  document.querySelectorAll('.folder-menu.show').forEach(m => m.classList.remove('show'));
+  contextMenuTarget = null;
+}
+
+/* ============================================================
+   NOTES CRUD
+   ============================================================ */
+function createNote() {
+  // Create in the first expanded folder, or uncategorized
+  const expandedFolder = folders.find(f => f.expanded);
+  createNoteInFolder(expandedFolder ? expandedFolder.id : null);
+}
+
+function createNoteInFolder(folderId) {
+  const id = 'n' + (nextId++);
+  const now = Date.now();
+  const note = {
+    id,
+    folderId,
+    title: '未命名笔记',
+    content: '',
+    updatedAt: now,
+  };
+  notes.unshift(note);
+  selectNote(id);
+  renderSidebar();
+}
+
+function selectNote(id) {
+  currentNoteId = id;
+  const note = notes.find(n => n.id === id);
+  if (!note) return;
+
+  // Show editor view
+  document.getElementById('editor-view').style.display = '';
+  document.getElementById('no-note-view').style.display = 'none';
+
+  // Set title
+  document.getElementById('note-title').value = note.title;
+
+  // Load content into Quill
+  if (quill) {
+    quill.root.innerHTML = note.content || '';
+  }
+
+  renderSidebar();
+}
+
+function updateTitle(value) {
+  if (!currentNoteId) return;
+  const note = notes.find(n => n.id === currentNoteId);
+  if (note) note.title = value || '未命名笔记';
+  updateSaveIndicator();
+  renderSidebarDebounced();
+}
+
+let sidebarRenderTimer = null;
+function renderSidebarDebounced() {
+  clearTimeout(sidebarRenderTimer);
+  sidebarRenderTimer = setTimeout(renderSidebar, 400);
+}
+
+function onEditorChange() {
+  if (!currentNoteId) return;
+  const note = notes.find(n => n.id === currentNoteId);
+  if (!note) return;
+
+  const html = quill.root.innerHTML;
+  note.content = html;
+  note.updatedAt = Date.now();
+  updateSaveIndicator();
+}
+
+function updateSaveIndicator() {
+  const indicator = document.querySelector('.save-indicator span:last-child');
+  const dot = document.querySelector('.save-dot');
+  if (indicator) indicator.textContent = '已保存';
+  if (dot) dot.style.background = '#48BB78';
+}
+
+function deleteNote(e, id) {
+  e.stopPropagation();
+  if (!confirm('确定要删除这篇笔记吗？')) return;
+  notes = notes.filter(n => n.id !== id);
+  if (currentNoteId === id) {
+    currentNoteId = null;
+    showNoNoteView();
+  }
+  renderSidebar();
+}
+
+function showNoNoteView() {
+  document.getElementById('editor-view').style.display = 'none';
+  document.getElementById('no-note-view').style.display = '';
+  currentNoteId = null;
+}
+
+/* ============================================================
+   FOLDERS CRUD
+   ============================================================ */
+function createFolder() {
+  showDialog('新建文件夹', '输入文件夹名称', (name) => {
+    const id = 'f' + (nextId++);
+    folders.push({ id, name: name.trim(), expanded: true });
+    renderSidebar();
+  });
+}
+
+function renameFolder(folder) {
+  showDialog('重命名文件夹', '输入新名称', (name) => {
+    folder.name = name.trim();
+    renderSidebar();
+  }, folder.name);
+}
+
+function deleteFolder(folder) {
+  if (!confirm(`确定要删除「${folder.name}」吗？其中的笔记不会被删除。`)) return;
+  // Move notes to no folder
+  notes.forEach(n => { if (n.folderId === folder.id) n.folderId = null; });
+  // Delete sub-folders recursively
+  function removeChildren(parentId) {
+    const children = folders.filter(f => f.parentId === parentId);
+    children.forEach(c => {
+      notes.forEach(n => { if (n.folderId === c.id) n.folderId = null; });
+      removeChildren(c.id);
+    });
+    folders = folders.filter(f => f.parentId !== parentId && f.id !== parentId);
+  }
+  removeChildren(folder.id);
+  folders = folders.filter(f => f.id !== folder.id);
+  renderSidebar();
+}
+
+/* ============================================================
+   SEARCH (UI only — filters notes in sidebar)
+   ============================================================ */
+function handleSearch(query) {
+  if (!query.trim()) {
+    renderSidebar();
+    return;
+  }
+
+  const q = query.toLowerCase();
+  const tree = document.getElementById('folder-tree');
+  const matchedNotes = notes.filter(n =>
+    n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q)
+  );
+
+  if (matchedNotes.length === 0) {
+    tree.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <p>没有找到匹配的笔记</p>
+      </div>`;
+    return;
+  }
+
+  // Show search results as a flat list
+  tree.innerHTML = `
+    <div style="padding:8px 0;font-size:12px;color:var(--color-muted);font-weight:500">搜索结果 (${matchedNotes.length})</div>
+    ${matchedNotes.map(n => `
+      <div class="note-item${currentNoteId === n.id ? ' active' : ''}" onclick="selectNote('${n.id}')" style="padding-left:8px">
+        <span class="note-title-text">${highlightMatch(n.title, q)}</span>
+        <span class="note-date">${formatDate(n.updatedAt)}</span>
+      </div>`).join('')}
+  `;
+}
+
+function highlightMatch(text, query) {
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return escapeHtml(text);
+  return escapeHtml(text.slice(0, idx)) +
+    '<strong style="background:var(--color-indigo);color:white;padding:0 2px;border-radius:2px">' +
+    escapeHtml(text.slice(idx, idx + query.length)) +
+    '</strong>' +
+    escapeHtml(text.slice(idx + query.length));
+}
+
+/* ============================================================
+   DIALOG
+   ============================================================ */
+let dialogCallback = null;
+
+function showDialog(title, placeholder, onConfirm, prefill = '') {
+  document.getElementById('dialog-title').textContent = title;
+  const input = document.getElementById('dialog-input');
+  input.placeholder = placeholder;
+  input.value = prefill;
+  document.getElementById('dialog').classList.add('show');
+  input.focus();
+  input.select();
+  dialogCallback = onConfirm;
+}
+
+function closeDialog() {
+  document.getElementById('dialog').classList.remove('show');
+  dialogCallback = null;
+}
+
+document.getElementById('dialog-confirm').addEventListener('click', () => {
+  const value = document.getElementById('dialog-input').value.trim();
+  if (!value) return;
+  if (dialogCallback) dialogCallback(value);
+  closeDialog();
+});
+
+document.getElementById('dialog').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeDialog();
+});
+
+/* ============================================================
+   UTILS
+   ============================================================ */
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 86400000 && now.getDate() === d.getDate()) {
+    return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  }
+  if (diff < 604800000) {
+    const days = ['日', '一', '二', '三', '四', '五', '六'];
+    return '周' + days[d.getDay()];
+  }
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+/* ============================================================
+   START
+   ============================================================ */
+window.addEventListener('DOMContentLoaded', init);
+</script>
+
+</body>
+</html>
